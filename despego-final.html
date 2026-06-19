@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Despego — Transfer al aeropuerto desde la Sabana</title>
+<meta name="description" content="Transfer premium al aeropuerto El Dorado desde Cota, Chía, Cajicá y Bogotá. Precio fijo, conductores de confianza, confirmación inmediata.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:'DM Sans',-apple-system,sans-serif;background:#FAFAF8;color:#0C0C0C;-webkit-font-smoothing:antialiased;}
+  select,input,textarea,button{font-family:inherit;outline:none;}
+  button{cursor:pointer;border:none;background:none;}
+  a{text-decoration:none;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes pop{0%{transform:scale(0.95);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .fade-up{animation:fadeUp 0.5s ease forwards;}
+  .card-pop{animation:pop 0.2s ease forwards;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:#D4A574;border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── CONFIGURACIÓN ── CAMBIA ESTO ANTES DE PUBLICAR ──────────────────────────
+const WA = "573175507728";
+
+// ── Constantes ───────────────────────────────────────────────────────────────
+const TARIFAS = {
+  cota:       { aeropuerto: 100000 },
+  chia:       { aeropuerto: 110000 },
+  cajica:     { aeropuerto: 120000 },
+  bogota:     { aeropuerto: 70000  },
+  aeropuerto: { cota: 100000, chia: 125000, cajica: 135000, bogota: 70000 },
+};
+
+const LUGARES = {
+  cota:"Cota", chia:"Chía", cajica:"Cajicá", bogota:"Bogotá", aeropuerto:"Aeropuerto El Dorado"
+};
+
+const DESTINOS = {
+  cota:["aeropuerto"], chia:["aeropuerto"], cajica:["aeropuerto"], bogota:["aeropuerto"],
+  aeropuerto:["cota","chia","cajica","bogota"],
+};
+
+const PEAJE = {
+  aeropuerto_chia:"Incluye peaje de regreso a la Sabana",
+  aeropuerto_cajica:"Incluye peaje de regreso a la Sabana",
+};
+
+const LUGAR_META = {
+  cota:       {icon:"🏡", label:"Cota",        sub:"Sabana occidente"},
+  chia:       {icon:"🌿", label:"Chía",        sub:"Sabana norte"},
+  cajica:     {icon:"⛳", label:"Cajicá",      sub:"Sabana norte"},
+  bogota:     {icon:"🏙️", label:"Bogotá",      sub:"Zona norte"},
+  aeropuerto: {icon:"✈️", label:"El Dorado",   sub:"Aeropuerto"},
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const fmtPrice = n => "$" + n.toLocaleString("es-CO") + " COP";
+const fmtDate  = d => {
+  if (!d) return "";
+  const [y,m,day] = d.split("-");
+  const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return `${parseInt(day)} ${M[parseInt(m)-1]} ${y}`;
+};
+const todayStr = () => new Date().toISOString().split("T")[0];
+let nextId = 10;
+
+// ── Atoms ─────────────────────────────────────────────────────────────────────
+function Badge({status}){
+  const c={pending:{l:"Pendiente",bg:"#FEF3C7",co:"#92400E"},confirmed:{l:"Confirmado",bg:"#D1FAE5",co:"#065F46"},rejected:{l:"Rechazado",bg:"#FEE2E2",co:"#991B1B"}};
+  const s=c[status]||c.pending;
+  return <span style={{background:s.bg,color:s.co,padding:"3px 12px",borderRadius:100,fontSize:"0.72rem",fontWeight:600}}>{s.l}</span>;
+}
+
+function WAIcon({size=18}){
+  return(
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.532 5.86L.057 23.571a.5.5 0 0 0 .614.612l5.796-1.522A11.953 11.953 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 0 1-5.045-1.393l-.362-.215-3.739.982.998-3.648-.236-.374A9.808 9.808 0 0 1 2.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+    </svg>
+  );
+}
+
+// ── Calculadora ───────────────────────────────────────────────────────────────
+function Calculadora({onReservar}){
+  const [origen,setOrigen]=useState("");
+  const [destino,setDestino]=useState("");
+  const [step,setStep]=useState(1);
+
+  const precio = origen&&destino ? TARIFAS[origen]?.[destino] : null;
+  const nota   = PEAJE[`${origen}_${destino}`] || "Tarifa fija · Sin cobros adicionales";
+  const waMsg  = precio
+    ? `Hola, quiero reservar un transfer de ${LUGARES[origen]} a ${LUGARES[destino]}. Vi la tarifa de ${fmtPrice(precio)}.`
+    : "Hola, quiero reservar un transfer al aeropuerto.";
+
+  function selectOrigen(v){setOrigen(v);setDestino("");setStep(2);}
+  function selectDestino(v){setDestino(v);setStep(3);}
+  function reset(){setOrigen("");setDestino("");setStep(1);}
+
+  const destinoKeys = origen ? DESTINOS[origen] : [];
+
+  const Pill = () => origen ? (
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,background:"#F0EDE8",borderRadius:100,padding:"6px 14px",fontSize:"0.85rem",fontWeight:500}}>
+        {LUGAR_META[origen].icon} {LUGAR_META[origen].label}
+        {destino&&<><span style={{color:"#B8845A",margin:"0 4px"}}>→</span>{LUGAR_META[destino].icon} {LUGAR_META[destino].label}</>}
+      </div>
+      <button onClick={reset} style={{border:"1px solid rgba(0,0,0,0.12)",borderRadius:100,padding:"5px 12px",fontSize:"0.78rem",color:"#6B6B6B"}}>Cambiar</button>
+    </div>
+  ) : null;
+
+  const Card = ({k,onClick}) => (
+    <button onClick={()=>onClick(k)} className="card-pop"
+      style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 12px",borderRadius:16,border:"2px solid rgba(0,0,0,0.08)",background:"white",cursor:"pointer",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",transition:"all 0.15s",width:"100%"}}>
+      <span style={{fontSize:"1.8rem",marginBottom:8}}>{LUGAR_META[k].icon}</span>
+      <span style={{fontSize:"0.88rem",fontWeight:600,color:"#0C0C0C",marginBottom:2}}>{LUGAR_META[k].label}</span>
+      <span style={{fontSize:"0.7rem",color:"#aaa"}}>{LUGAR_META[k].sub}</span>
+    </button>
+  );
+
+  return(
+    <div style={{background:"white",borderRadius:24,padding:"32px 28px",border:"1.5px solid rgba(0,0,0,0.07)",boxShadow:"0 8px 40px rgba(0,0,0,0.08)"}}>
+      <Pill/>
+
+      {step===1&&(
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:22}}>
+            <div style={{background:"#B8845A",color:"white",width:26,height:26,borderRadius:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.75rem",fontWeight:700,flexShrink:0}}>1</div>
+            <div>
+              <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.3rem",lineHeight:1.1}}>¿Desde dónde sales?</p>
+              <p style={{fontSize:"0.78rem",color:"#999",marginTop:2}}>Toca tu ciudad de origen 👇</p>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10}}>
+            {Object.keys(LUGAR_META).map(k=><Card key={k} k={k} onClick={selectOrigen}/>)}
+          </div>
+        </div>
+      )}
+
+      {step===2&&(
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:22}}>
+            <div style={{background:"#B8845A",color:"white",width:26,height:26,borderRadius:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.75rem",fontWeight:700,flexShrink:0}}>2</div>
+            <div>
+              <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.3rem",lineHeight:1.1}}>¿A dónde vas?</p>
+              <p style={{fontSize:"0.78rem",color:"#999",marginTop:2}}>Toca tu destino 👇</p>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10}}>
+            {destinoKeys.map(k=><Card key={k} k={k} onClick={selectDestino}/>)}
+          </div>
+        </div>
+      )}
+
+      {step===3&&precio&&(
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,background:"#F8F6F2",borderRadius:16,padding:"18px 20px"}}>
+            <div style={{textAlign:"center",flex:1}}>
+              <span style={{fontSize:"2rem"}}>{LUGAR_META[origen].icon}</span>
+              <p style={{fontSize:"0.8rem",fontWeight:600,marginTop:6}}>{LUGAR_META[origen].label}</p>
+            </div>
+            <div style={{flex:2,textAlign:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <div style={{flex:1,height:2,background:"linear-gradient(90deg,#B8845A,#E8C4A0)"}}/>
+                <span style={{fontSize:"1.2rem"}}>✈</span>
+                <div style={{flex:1,height:2,background:"linear-gradient(90deg,#E8C4A0,#B8845A)"}}/>
+              </div>
+              <p style={{fontSize:"0.7rem",color:"#999",marginTop:6}}>Transfer directo</p>
+            </div>
+            <div style={{textAlign:"center",flex:1}}>
+              <span style={{fontSize:"2rem"}}>{LUGAR_META[destino].icon}</span>
+              <p style={{fontSize:"0.8rem",fontWeight:600,marginTop:6}}>{LUGAR_META[destino].label}</p>
+            </div>
+          </div>
+
+          <div style={{textAlign:"center",marginBottom:24}}>
+            <p style={{fontSize:"0.7rem",letterSpacing:"0.1em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:8}}>Tu tarifa fija</p>
+            <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"3rem",letterSpacing:"-0.03em",lineHeight:1}}>{fmtPrice(precio)}</p>
+            <p style={{fontSize:"0.78rem",color:"#aaa",marginTop:8,fontWeight:300}}>{nota}</p>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <button onClick={()=>onReservar({origen,destino,precio})}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#B8845A",color:"white",padding:"16px",borderRadius:14,fontSize:"0.95rem",fontWeight:500}}>
+              ✈ Reservar este viaje
+            </button>
+            <a href={`https://wa.me/${WA}?text=${encodeURIComponent(waMsg)}`} target="_blank"
+              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#25D366",color:"white",padding:"15px",borderRadius:14,fontSize:"0.95rem",fontWeight:500}}>
+              <WAIcon size={16}/> Reservar por WhatsApp
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Landing ───────────────────────────────────────────────────────────────────
+function Landing({user,onLogin,onReservar}){
+  return(
+    <div>
+      {/* NAV */}
+      <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:100,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 28px",background:"rgba(250,250,248,0.94)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(0,0,0,0.06)"}}>
+        <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.8rem",letterSpacing:"-0.03em"}}>Despego<span style={{color:"#B8845A"}}>.</span></span>
+        <button onClick={onLogin} style={{background:"#0C0C0C",color:"white",padding:"10px 20px",borderRadius:100,fontSize:"0.85rem",fontWeight:500}}>
+          {user ? "Mi cuenta" : "Iniciar sesión"}
+        </button>
+      </nav>
+
+      {/* HERO */}
+      <div style={{maxWidth:860,margin:"0 auto",padding:"130px 28px 70px"}}>
+        <p className="fade-up" style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"#B8845A",marginBottom:20,animationDelay:"0.1s",opacity:0}}>Transfer premium · Sabana y norte de Bogotá</p>
+        <h1 className="fade-up" style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(2.6rem,7vw,4.8rem)",lineHeight:1.06,letterSpacing:"-0.03em",marginBottom:22,animationDelay:"0.25s",opacity:0}}>
+          Tu vuelo empieza<br/><em style={{fontStyle:"italic",color:"#B8845A"}}>desde casa.</em>
+        </h1>
+        <p className="fade-up" style={{fontSize:"1.05rem",color:"#6B6B6B",maxWidth:460,fontWeight:300,lineHeight:1.75,marginBottom:36,animationDelay:"0.4s",opacity:0}}>
+          Transfers al aeropuerto El Dorado desde Cota, Chía, Cajicá y Bogotá. Precio fijo, conductores de confianza, confirmación inmediata.
+        </p>
+        <div className="fade-up" style={{display:"flex",gap:12,flexWrap:"wrap",animationDelay:"0.55s",opacity:0}}>
+          <a href="#calculadora" style={{background:"#0C0C0C",color:"white",padding:"15px 28px",borderRadius:100,fontSize:"0.9rem",fontWeight:500}}>Calcular mi tarifa</a>
+          <a href={`https://wa.me/${WA}?text=${encodeURIComponent("Hola, quiero reservar un transfer al aeropuerto.")}`} target="_blank"
+            style={{display:"flex",alignItems:"center",gap:8,background:"transparent",color:"#0C0C0C",border:"1.5px solid rgba(0,0,0,0.18)",padding:"15px 28px",borderRadius:100,fontSize:"0.9rem",fontWeight:500}}>
+            <WAIcon size={16}/> WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* CALCULADORA */}
+      <div id="calculadora" style={{maxWidth:860,margin:"0 auto",padding:"0 28px 80px"}}>
+        <p style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:10}}>Calcula tu tarifa</p>
+        <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(1.7rem,4vw,2.5rem)",letterSpacing:"-0.02em",lineHeight:1.1,marginBottom:24}}>Sin sorpresas.<br/>Precio fijo antes de salir.</h2>
+        <Calculadora onReservar={onReservar}/>
+      </div>
+
+      {/* PAGOS */}
+      <div style={{background:"#F0EDE8"}}>
+        <div style={{maxWidth:860,margin:"0 auto",padding:"60px 28px"}}>
+          <p style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:10}}>Formas de pago</p>
+          <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(1.7rem,4vw,2.5rem)",letterSpacing:"-0.02em",marginBottom:28}}>Paga como<br/>más te convenga.</h2>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+            {[["💵","Efectivo"],["💳","Tarjeta crédito o débito"],["📱","Nequi"],["🔲","Código QR / Transferencia"]].map(([i,l])=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:12,background:"white",padding:"18px 20px",borderRadius:14,fontSize:"0.88rem",boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
+                <span style={{fontSize:"1.3rem"}}>{i}</span><span>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* COMO FUNCIONA */}
+      <div style={{maxWidth:860,margin:"0 auto",padding:"70px 28px"}}>
+        <p style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:10}}>El proceso</p>
+        <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(1.7rem,4vw,2.5rem)",letterSpacing:"-0.02em",marginBottom:40}}>Reserva en tres pasos.</h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:40}}>
+          {[
+            ["Escríbenos o reserva en la web","Cuéntanos origen, destino, fecha y hora. Te confirmamos en minutos."],
+            ["Confirma y paga","Acepta la tarifa fija y paga como prefieras. Recibo digital incluido."],
+            ["Recibe confirmación el día del viaje","Dos horas antes te llega un WhatsApp confirmando que tu conductor está en camino."],
+          ].map(([t,tx],i)=>(
+            <div key={i}>
+              <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"2.5rem",color:"rgba(0,0,0,0.07)",lineHeight:1,marginBottom:14}}>0{i+1}</p>
+              <h3 style={{fontWeight:500,fontSize:"1rem",marginBottom:8}}>{t}</h3>
+              <p style={{fontSize:"0.875rem",color:"#6B6B6B",fontWeight:300,lineHeight:1.75}}>{tx}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* POR QUE */}
+      <div style={{maxWidth:860,margin:"0 auto",padding:"0 28px 70px"}}>
+        <p style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:10}}>Por qué Despego</p>
+        <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(1.7rem,4vw,2.5rem)",letterSpacing:"-0.02em",marginBottom:32}}>No es un Uber.<br/>Es como que te lleva un conocido.</h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
+          {[
+            ["🕐","Puntualidad garantizada","Reserva con anticipación y tu conductor llega a la hora acordada, así sean las 3am. Sin precio variable por demanda, sin cancelaciones de último minuto."],
+            ["🤝","El carro llega, tú descansas","Conductores de la Sabana que saben lo que vale llegar puntual, ya sea al aeropuerto o de vuelta a casa. Tú solo piensa en el vuelo."],
+            ["🧾","Recibo digital incluido","Cada viaje genera un recibo completo. Fácil de legalizar como gasto corporativo ante tu empresa o cliente."],
+          ].map(([ic,ti,tx])=>(
+            <div key={ti} style={{padding:"28px 24px",border:"1.5px solid rgba(0,0,0,0.08)",borderRadius:16,transition:"border-color 0.2s"}}>
+              <div style={{width:42,height:42,background:"#F5EDE4",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",marginBottom:16}}>{ic}</div>
+              <h3 style={{fontWeight:500,fontSize:"1rem",marginBottom:8}}>{ti}</h3>
+              <p style={{fontSize:"0.85rem",color:"#6B6B6B",fontWeight:300,lineHeight:1.75}}>{tx}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{background:"#0C0C0C",color:"white",textAlign:"center",padding:"80px 28px"}}>
+        <p style={{fontSize:"0.72rem",fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:12}}>¿Tienes un vuelo?</p>
+        <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"clamp(1.8rem,5vw,3rem)",letterSpacing:"-0.02em",marginBottom:16}}>Reserva hoy.<br/>Viaja tranquilo mañana.</h2>
+        <p style={{color:"rgba(255,255,255,0.45)",fontWeight:300,marginBottom:36}}>Disponible todos los días, a cualquier hora.</p>
+        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+          <button onClick={onLogin} style={{background:"white",color:"#0C0C0C",padding:"16px 32px",borderRadius:100,fontSize:"0.95rem",fontWeight:500}}>Crear cuenta y reservar</button>
+          <a href={`https://wa.me/${WA}?text=${encodeURIComponent("Hola, quiero reservar un transfer al aeropuerto.")}`} target="_blank"
+            style={{display:"flex",alignItems:"center",gap:8,background:"#25D366",color:"white",padding:"16px 32px",borderRadius:100,fontSize:"0.95rem",fontWeight:500}}>
+            <WAIcon size={18}/> WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <div style={{padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid rgba(0,0,0,0.07)",flexWrap:"wrap",gap:12}}>
+        <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.2rem"}}>Despego<span style={{color:"#B8845A"}}>.</span></span>
+        <span style={{fontSize:"0.78rem",color:"#6B6B6B",fontWeight:300}}>Transfer premium · Sabana y norte de Bogotá</span>
+        <span style={{fontSize:"0.72rem",color:"#bbb"}}>© 2026 Despego</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function Auth({onLogin,onBack,onGuest}){
+  const [tab,setTab]=useState("login");
+  const [form,setForm]=useState({name:"",email:"",phone:"",password:""});
+  const [err,setErr]=useState("");
+
+  function submit(){
+    if(!form.email||!form.password){setErr("Completa todos los campos.");return;}
+    if(tab==="register"&&!form.name){setErr("Ingresa tu nombre.");return;}
+    if(form.email==="admin@despego.co"){onLogin(null,true);return;}
+    const u=tab==="register"
+      ?{id:"u"+Date.now(),name:form.name,email:form.email,phone:form.phone}
+      :{id:"u1",name:"Usuario",email:form.email,phone:form.phone};
+    onLogin(u,false);
+  }
+
+  const inp=(ph,f,t="text")=>(
+    <input type={t} placeholder={ph} value={form[f]} onChange={e=>setForm(x=>({...x,[f]:e.target.value}))}
+      style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"1.5px solid rgba(0,0,0,0.1)",fontSize:"0.95rem",marginBottom:10,background:"white"}}/>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#FAFAF8",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+      <button onClick={onBack} style={{position:"fixed",top:20,left:20,color:"#6B6B6B",fontSize:"0.85rem"}}>← Volver</button>
+      <div style={{width:"100%",maxWidth:380}}>
+        <h1 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"2rem",textAlign:"center",marginBottom:4}}>Despego<span style={{color:"#B8845A"}}>.</span></h1>
+        <p style={{textAlign:"center",color:"#6B6B6B",fontWeight:300,fontSize:"0.9rem",marginBottom:28}}>Tu transfer al aeropuerto</p>
+        <div style={{display:"flex",background:"#F0EDE8",borderRadius:12,padding:4,marginBottom:20}}>
+          {["login","register"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)}
+              style={{flex:1,padding:"10px",borderRadius:9,background:tab===t?"white":"transparent",fontSize:"0.875rem",fontWeight:tab===t?500:400,color:tab===t?"#0C0C0C":"#6B6B6B",transition:"all 0.2s"}}>
+              {t==="login"?"Iniciar sesión":"Crear cuenta"}
+            </button>
+          ))}
+        </div>
+        <div style={{background:"white",borderRadius:20,padding:24,boxShadow:"0 2px 20px rgba(0,0,0,0.07)"}}>
+          {tab==="register"&&inp("Nombre completo","name")}
+          {inp("Correo electrónico","email","email")}
+          {tab==="register"&&inp("Teléfono WhatsApp","phone","tel")}
+          {inp("Contraseña","password","password")}
+          {err&&<p style={{color:"#DC2626",fontSize:"0.82rem",marginBottom:10}}>{err}</p>}
+          <button onClick={submit}
+            style={{width:"100%",background:"#0C0C0C",color:"white",padding:"15px",borderRadius:12,fontSize:"0.95rem",fontWeight:500,marginBottom:12}}>
+            {tab==="login"?"Entrar":"Crear cuenta"}
+          </button>
+          <div style={{textAlign:"center",color:"#6B6B6B",fontSize:"0.82rem",marginBottom:12}}>— o —</div>
+          <button onClick={onGuest}
+            style={{width:"100%",background:"transparent",border:"1.5px solid rgba(0,0,0,0.12)",color:"#0C0C0C",padding:"14px",borderRadius:12,fontSize:"0.9rem"}}>
+            Reservar sin crear cuenta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Formulario reserva ─────────────────────────────────────────────────────────
+function ReservaForm({user,prefill,onSubmit,onBack}){
+  const needsFlight = f => f.origin==="aeropuerto"||f.destination==="aeropuerto";
+  const [form,setForm]=useState({
+    name:user?.name||"", phone:user?.phone||"",
+    origin:prefill?.origen||"", destination:prefill?.destino||"",
+    date:"", time:"", flightNumber:"", notes:"",
+  });
+  const [sent,setSent]=useState(false);
+  const [errors,setErrors]=useState({});
+
+  const precio = form.origin&&form.destination ? TARIFAS[form.origin]?.[form.destination] : null;
+  const dests  = form.origin ? DESTINOS[form.origin] : [];
+
+  function changeOrigen(v){setForm(f=>({...f,origin:v,destination:""}));}
+
+  function validate(){
+    const e={};
+    if(!form.name.trim()) e.name="Ingresa tu nombre";
+    if(!form.phone.trim()||form.phone.length<7) e.phone="Teléfono inválido";
+    if(!form.origin) e.origin="Selecciona origen";
+    if(!form.destination) e.destination="Selecciona destino";
+    if(!form.date) e.date="Selecciona fecha";
+    if(!form.time) e.time="Selecciona hora";
+    return e;
+  }
+
+  function handleSubmit(){
+    const e=validate();
+    if(Object.keys(e).length){setErrors(e);return;}
+    onSubmit({...form,price:precio,status:"pending",userId:user?.id||null,id:String(++nextId),createdAt:new Date().toISOString()});
+    setSent(true);
+  }
+
+  const inp=(label,field,type="text",ph="",required=false)=>(
+    <div style={{marginBottom:14}}>
+      <label style={{display:"block",fontSize:"0.7rem",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:errors[field]?"#DC2626":"#6B6B6B",marginBottom:6}}>{label}{required&&" *"}</label>
+      <input type={type} placeholder={ph} value={form[field]} min={type==="date"?todayStr():undefined}
+        onChange={e=>setForm(f=>({...f,[field]:e.target.value}))}
+        style={{width:"100%",padding:"13px 16px",borderRadius:12,border:`1.5px solid ${errors[field]?"#DC2626":"rgba(0,0,0,0.1)"}`,fontSize:"0.95rem",background:"white"}}/>
+      {errors[field]&&<p style={{color:"#DC2626",fontSize:"0.75rem",marginTop:4}}>{errors[field]}</p>}
+    </div>
+  );
+
+  const sel=(label,field,opts,ph,onChange)=>(
+    <div style={{marginBottom:14}}>
+      <label style={{display:"block",fontSize:"0.7rem",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:errors[field]?"#DC2626":"#6B6B6B",marginBottom:6}}>{label} *</label>
+      <div style={{position:"relative"}}>
+        <select value={form[field]} onChange={e=>(onChange||(v=>setForm(f=>({...f,[field]:v}))))(e.target.value)}
+          style={{width:"100%",padding:"13px 40px 13px 16px",borderRadius:12,border:`1.5px solid ${errors[field]?"#DC2626":"rgba(0,0,0,0.1)"}`,fontSize:"0.95rem",background:"white",color:form[field]?"#0C0C0C":"#999",appearance:"none"}}>
+          <option value="">{ph}</option>
+          {opts.map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+        <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",color:"#999",pointerEvents:"none",fontSize:"0.65rem"}}>▼</span>
+      </div>
+      {errors[field]&&<p style={{color:"#DC2626",fontSize:"0.75rem",marginTop:4}}>{errors[field]}</p>}
+    </div>
+  );
+
+  if(sent) return(
+    <div style={{minHeight:"100vh",background:"#FAFAF8",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,textAlign:"center"}}>
+      <div style={{fontSize:"3.5rem",marginBottom:20}}>✅</div>
+      <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"2rem",marginBottom:12}}>¡Reserva recibida!</h2>
+      <p style={{color:"#6B6B6B",fontWeight:300,maxWidth:340,lineHeight:1.75,marginBottom:12}}>
+        Tu solicitud está <strong>pendiente de confirmación</strong>. Te contactaremos por WhatsApp al número <strong>{form.phone}</strong> en los próximos minutos.
+      </p>
+      <p style={{color:"#aaa",fontSize:"0.85rem",fontWeight:300,marginBottom:32}}>
+        📍 Te pediremos la dirección exacta de recogida por WhatsApp.
+      </p>
+      <button onClick={onBack} style={{background:"#0C0C0C",color:"white",padding:"14px 28px",borderRadius:100,fontSize:"0.9rem",fontWeight:500}}>
+        {user?"Ver mis reservas":"Volver al inicio"}
+      </button>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#FAFAF8"}}>
+      <div style={{maxWidth:480,margin:"0 auto",padding:"28px 20px 80px"}}>
+        <button onClick={onBack} style={{color:"#6B6B6B",fontSize:"0.85rem",marginBottom:24}}>← Volver</button>
+        <h1 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"2rem",letterSpacing:"-0.02em",marginBottom:4}}>Nueva reserva</h1>
+        <p style={{color:"#6B6B6B",fontWeight:300,fontSize:"0.9rem",marginBottom:24}}>Completa los datos y te confirmamos por WhatsApp.</p>
+
+        {/* Datos personales */}
+        <div style={{background:"white",borderRadius:20,padding:22,boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:14}}>
+          <p style={{fontSize:"0.7rem",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:14}}>Tus datos</p>
+          {inp("Nombre","name","text","Tu nombre completo",true)}
+          {inp("Teléfono WhatsApp","phone","tel","3001234567",true)}
+        </div>
+
+        {/* El viaje */}
+        <div style={{background:"white",borderRadius:20,padding:22,boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:14}}>
+          <p style={{fontSize:"0.7rem",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:14}}>El viaje</p>
+          {sel("Origen","origin",Object.entries(LUGARES),"¿Desde dónde?",changeOrigen)}
+          {sel("Destino","destination",dests.map(k=>[k,LUGARES[k]]),form.origin?"¿A dónde?":"Selecciona origen primero")}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {inp("Fecha","date","date","",true)}
+            {inp("Hora de recogida","time","time","",true)}
+          </div>
+          {needsFlight(form)&&inp("Número de vuelo","flightNumber","text","Ej: AV204","false")}
+          {needsFlight(form)&&(
+            <p style={{fontSize:"0.78rem",color:"#B8845A",marginBottom:14,lineHeight:1.6}}>
+              ✈ Con tu número de vuelo monitoreamos llegadas o salidas. Si hay retrasos, te avisamos.
+            </p>
+          )}
+          <div>
+            <label style={{display:"block",fontSize:"0.7rem",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:"#6B6B6B",marginBottom:6}}>Notas (opcional)</label>
+            <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
+              placeholder="Ej: tengo maleta grande, voy con mascota..."
+              style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"1.5px solid rgba(0,0,0,0.1)",fontSize:"0.9rem",resize:"vertical",minHeight:72}}/>
+          </div>
+        </div>
+
+        {/* Nota dirección */}
+        <div style={{background:"#FEF3C7",borderRadius:14,padding:"14px 18px",marginBottom:14,display:"flex",gap:10,alignItems:"flex-start"}}>
+          <span style={{fontSize:"1rem"}}>📍</span>
+          <p style={{fontSize:"0.82rem",color:"#92400E",lineHeight:1.6,fontWeight:400}}>
+            Una vez confirmada tu reserva, te pediremos la <strong>dirección exacta de recogida</strong> por WhatsApp.
+          </p>
+        </div>
+
+        {/* Precio */}
+        {precio&&(
+          <div style={{background:"#0C0C0C",borderRadius:18,padding:"18px 22px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <p style={{fontSize:"0.68rem",color:"rgba(255,255,255,0.4)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>Tu tarifa fija</p>
+              <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"2rem",color:"white",letterSpacing:"-0.02em"}}>{fmtPrice(precio)}</p>
+            </div>
+            <span style={{fontSize:"1.8rem"}}>✈</span>
+          </div>
+        )}
+
+        <button onClick={handleSubmit}
+          style={{width:"100%",background:precio?"#B8845A":"#ddd",color:precio?"white":"#999",padding:"16px",borderRadius:14,fontSize:"0.95rem",fontWeight:500,cursor:precio?"pointer":"not-allowed",transition:"background 0.2s"}}>
+          Enviar solicitud de reserva
+        </button>
+        <p style={{textAlign:"center",fontSize:"0.78rem",color:"#aaa",marginTop:10}}>No se cobra hasta confirmar. Te contactamos por WhatsApp.</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard cliente ──────────────────────────────────────────────────────────
+function Dashboard({user,reservas,onNuevaReserva,onLogout}){
+  const mias = reservas.filter(r=>r.userId===user.id||r.phone===user.phone).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  return(
+    <div style={{minHeight:"100vh",background:"#FAFAF8"}}>
+      <div style={{background:"#0C0C0C",color:"white",padding:"24px 24px 32px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.4rem"}}>Despego<span style={{color:"#B8845A"}}>.</span></span>
+          <button onClick={onLogout} style={{border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.7)",padding:"7px 14px",borderRadius:100,fontSize:"0.78rem"}}>Salir</button>
+        </div>
+        <p style={{fontSize:"0.78rem",color:"rgba(255,255,255,0.45)",marginBottom:4}}>Bienvenido</p>
+        <h1 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.8rem"}}>{user.name}</h1>
+      </div>
+      <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px"}}>
+        <button onClick={onNuevaReserva}
+          style={{width:"100%",background:"#B8845A",color:"white",padding:"16px",borderRadius:14,fontSize:"1rem",fontWeight:500,marginBottom:28,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          ✈ Nueva reserva
+        </button>
+        <h2 style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.4rem",marginBottom:16}}>Mis viajes</h2>
+        {mias.length===0?(
+          <div style={{textAlign:"center",padding:"48px 20px",color:"#6B6B6B"}}>
+            <p style={{fontSize:"2rem",marginBottom:12}}>✈</p>
+            <p style={{fontWeight:300}}>Aún no tienes reservas.</p>
+          </div>
+        ):mias.map(r=>(
+          <div key={r.id} style={{background:"white",borderRadius:16,padding:20,boxShadow:"0 1px 12px rgba(0,0,0,0.06)",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <div>
+                <p style={{fontWeight:500}}>{LUGARES[r.origin]} → {LUGARES[r.destination]}</p>
+                <p style={{fontSize:"0.85rem",color:"#6B6B6B",marginTop:2}}>{fmtDate(r.date)} · {r.time}h</p>
+              </div>
+              <Badge status={r.status}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid rgba(0,0,0,0.06)",paddingTop:10}}>
+              <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.3rem"}}>{fmtPrice(r.price)}</span>
+              {r.status==="confirmed"&&(
+                <a href={`https://wa.me/${WA}?text=${encodeURIComponent("Hola, tengo una reserva confirmada con Despego para el "+fmtDate(r.date)+" a las "+r.time+"h.")}`} target="_blank"
+                  style={{display:"flex",alignItems:"center",gap:6,background:"#25D366",color:"white",padding:"8px 14px",borderRadius:100,fontSize:"0.78rem",fontWeight:500}}>
+                  <WAIcon size={13}/> Contactar
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Panel Admin ────────────────────────────────────────────────────────────────
+function Admin({reservas,onUpdate,onLogout,onLanding}){
+  const [filtro,setFiltro]=useState("all");
+  const lista=reservas.filter(r=>filtro==="all"||r.status===filtro).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const cnt={pending:reservas.filter(r=>r.status==="pending").length,confirmed:reservas.filter(r=>r.status==="confirmed").length,total:reservas.length};
+
+  const waConfirm=r=>{
+    const msg=`Hola ${r.name.split(" ")[0]} 👋, tu transfer con Despego está *confirmado* ✅\n\n📍 ${LUGARES[r.origin]} → ${LUGARES[r.destination]}\n📅 ${fmtDate(r.date)} a las ${r.time}h\n💰 ${fmtPrice(r.price)}\n\n¿Nos confirmas la dirección exacta de recogida?`;
+    return `https://wa.me/57${r.phone.replace(/\D/g,"")}?text=${encodeURIComponent(msg)}`;
+  };
+  const waReject=r=>{
+    const msg=`Hola ${r.name.split(" ")[0]}, lamentablemente ese horario no está disponible. ¿Podemos revisar otra fecha o destino?`;
+    return `https://wa.me/57${r.phone.replace(/\D/g,"")}?text=${encodeURIComponent(msg)}`;
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:"#FAFAF8"}}>
+      <div style={{background:"#0C0C0C",color:"white",padding:"22px 20px 28px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.3rem"}}>Despego<span style={{color:"#B8845A"}}>.</span> <span style={{fontSize:"0.75rem",color:"rgba(255,255,255,0.35)",fontFamily:"DM Sans,sans-serif"}}>Admin</span></span>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onLanding} style={{border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.6)",padding:"6px 12px",borderRadius:100,fontSize:"0.75rem"}}>Ver web</button>
+            <button onClick={onLogout} style={{border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.6)",padding:"6px 12px",borderRadius:100,fontSize:"0.75rem"}}>Salir</button>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+          {[["⏳",cnt.pending,"Pendientes"],["✅",cnt.confirmed,"Confirmados"],["📋",cnt.total,"Total"]].map(([ic,n,l])=>(
+            <div key={l} style={{background:"rgba(255,255,255,0.07)",borderRadius:12,padding:"14px",textAlign:"center"}}>
+              <p style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.8rem",lineHeight:1}}>{n}</p>
+              <p style={{fontSize:"0.7rem",color:"rgba(255,255,255,0.4)",marginTop:4}}>{l}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{maxWidth:580,margin:"0 auto",padding:"18px 18px 80px"}}>
+        <div style={{display:"flex",gap:8,marginBottom:18,overflowX:"auto",paddingBottom:4}}>
+          {[["all","Todas"],["pending","Pendientes"],["confirmed","Confirmadas"],["rejected","Rechazadas"]].map(([k,v])=>(
+            <button key={k} onClick={()=>setFiltro(k)}
+              style={{padding:"8px 16px",borderRadius:100,border:"1.5px solid",borderColor:filtro===k?"#0C0C0C":"rgba(0,0,0,0.1)",background:filtro===k?"#0C0C0C":"transparent",color:filtro===k?"white":"#6B6B6B",fontSize:"0.82rem",whiteSpace:"nowrap",fontWeight:filtro===k?500:400}}>
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {lista.length===0&&<p style={{textAlign:"center",color:"#6B6B6B",padding:"40px 0",fontWeight:300}}>Sin reservas.</p>}
+
+        {lista.map(r=>(
+          <div key={r.id} style={{background:"white",borderRadius:16,padding:20,boxShadow:"0 1px 12px rgba(0,0,0,0.06)",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+              <div>
+                <p style={{fontWeight:500,fontSize:"1rem"}}>{r.name}</p>
+                <p style={{fontSize:"0.82rem",color:"#6B6B6B"}}>📱 {r.phone}</p>
+              </div>
+              <Badge status={r.status}/>
+            </div>
+            <div style={{background:"#F8F6F2",borderRadius:10,padding:"12px 14px",marginBottom:12,fontSize:"0.88rem"}}>
+              <p>📍 <strong>{LUGARES[r.origin]}</strong> → <strong>{LUGARES[r.destination]}</strong></p>
+              <p style={{marginTop:4,color:"#6B6B6B"}}>📅 {fmtDate(r.date)} · {r.time}h</p>
+              {r.flightNumber&&<p style={{marginTop:4,color:"#B8845A"}}>✈ Vuelo: {r.flightNumber}</p>}
+              {r.notes&&<p style={{marginTop:4,color:"#888",fontStyle:"italic"}}>💬 "{r.notes}"</p>}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:r.status==="pending"?12:0}}>
+              <span style={{fontFamily:"DM Serif Display,Georgia,serif",fontSize:"1.4rem"}}>{fmtPrice(r.price)}</span>
+              <span style={{fontSize:"0.74rem",color:"#bbb"}}>{new Date(r.createdAt).toLocaleDateString("es-CO")}</span>
+            </div>
+            {r.status==="pending"&&(
+              <div style={{display:"flex",gap:8,borderTop:"1px solid rgba(0,0,0,0.06)",paddingTop:12}}>
+                <a href={waConfirm(r)} target="_blank" onClick={()=>onUpdate(r.id,"confirmed")}
+                  style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:"#25D366",color:"white",padding:"12px",borderRadius:10,fontSize:"0.85rem",fontWeight:500}}>
+                  <WAIcon size={14}/> Confirmar
+                </a>
+                <a href={waReject(r)} target="_blank" onClick={()=>onUpdate(r.id,"rejected")}
+                  style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:"#FEE2E2",color:"#991B1B",padding:"12px",borderRadius:10,fontSize:"0.85rem",fontWeight:500}}>
+                  Rechazar
+                </a>
+              </div>
+            )}
+            {r.status==="confirmed"&&(
+              <a href={waConfirm(r)} target="_blank"
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,background:"rgba(37,211,102,0.1)",color:"#065F46",padding:"10px",borderRadius:10,fontSize:"0.82rem",fontWeight:500,marginTop:8}}>
+                <WAIcon size={13}/> Reenviar confirmación y pedir dirección
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── App principal ──────────────────────────────────────────────────────────────
+function App(){
+  const [view,setView]     = useState("landing");
+  const [user,setUser]     = useState(null);
+  const [isAdmin,setAdmin] = useState(false);
+  const [reservas,setRes]  = useState([]);
+  const [prefill,setPrefill] = useState(null);
+
+  function handleLogin(u,admin){
+    if(admin){setAdmin(true);setView("admin");return;}
+    setUser(u);
+    setView(prefill ? "reserve" : "dashboard");
+  }
+
+  function handleReservar(data){
+    setPrefill(data);
+    setView(user ? "reserve" : "auth");
+  }
+
+  function handleSubmit(r){
+    setRes(prev=>[r,...prev]);
+    setSent(true);
+  }
+
+  // workaround: sent state at App level
+  function handleReservaSubmit(r){
+    setRes(prev=>[r,...prev]);
+    setPrefill(null);
+  }
+
+  function handleLogout(){setUser(null);setAdmin(false);setView("landing");}
+
+  if(view==="landing") return <Landing user={user} onLogin={()=>setView("auth")} onReservar={handleReservar}/>;
+  if(view==="auth")    return <Auth onLogin={handleLogin} onBack={()=>setView("landing")} onGuest={()=>setView("reserve")}/>;
+  if(view==="reserve") return <ReservaForm user={user} prefill={prefill} onSubmit={handleReservaSubmit} onBack={()=>setView(user?"dashboard":"landing")}/>;
+  if(view==="dashboard"&&user) return <Dashboard user={user} reservas={reservas} onNuevaReserva={()=>{setPrefill(null);setView("reserve");}} onLogout={handleLogout}/>;
+  if(view==="admin"&&isAdmin) return <Admin reservas={reservas} onUpdate={(id,s)=>setRes(p=>p.map(r=>r.id===id?{...r,status:s}:r))} onLogout={handleLogout} onLanding={()=>setView("landing")}/>;
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
